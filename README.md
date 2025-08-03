@@ -53,6 +53,14 @@ echo -e "Firefox\nSafari\nChrome" | mac-menu
 
 The selected item will be printed to stdout.
 
+### Options
+
+- `--persistent`: Disable the close-on-blur behavior. By default, the window closes when you click outside of it. With this flag, the window will remain open until you make a selection or press Escape.
+
+```bash
+echo -e "Firefox\nSafari\nChrome" | mac-menu --persistent
+```
+
 ### Keyboard Shortcuts
 
 - `Up Arrow` or `Ctrl+P`: Move selection up

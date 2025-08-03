@@ -74,6 +74,12 @@ class MenuApp: NSObject, NSApplicationDelegate, NSTableViewDataSource, NSTableVi
     /// Items filtered by search query
     var filteredItems: [String] = []
     
+    /// Previously active application before mac-menu was launched
+    var previouslyActiveApp: NSRunningApplication?
+    
+    /// Custom placeholder text for the search field
+    var placeholderText: String = "Search..."
+    
     /// Fuzzy search result containing the matched string and its score
     private struct FuzzyMatchResult {
         let string: String
@@ -177,6 +183,12 @@ class MenuApp: NSObject, NSApplicationDelegate, NSTableViewDataSource, NSTableVi
     /// Sets up the application window and UI components
     /// - Parameter notification: The launch notification
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Capture the previously active application
+        previouslyActiveApp = NSWorkspace.shared.frontmostApplication
+        
+        // Set custom placeholder text if provided
+        placeholderText = getPlaceholderText()
+        
         let screenSize = NSScreen.main!.frame
         let width: CGFloat = 720
         let itemHeight: CGFloat = 48
@@ -198,18 +210,20 @@ class MenuApp: NSObject, NSApplicationDelegate, NSTableViewDataSource, NSTableVi
             defer: false
         )
 
-        // Add mouse event monitor to handle clicks outside the window
-        NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
-            guard let self = self else { return }
-            let windowFrame = self.window.frame
-            let clickPoint = event.locationInWindow
-            
-            // Convert click point to screen coordinates
-            let screenPoint = self.window.convertPoint(toScreen: clickPoint)
-            
-            // Check if click is outside window frame
-            if !windowFrame.contains(screenPoint) {
-                NSApp.terminate(nil)
+        // Add mouse event monitor to handle clicks outside the window (only if not in persistent mode)
+        if !isPersistentMode() {
+            NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
+                guard let self = self else { return }
+                let windowFrame = self.window.frame
+                let clickPoint = event.locationInWindow
+                
+                // Convert click point to screen coordinates
+                let screenPoint = self.window.convertPoint(toScreen: clickPoint)
+                
+                // Check if click is outside window frame
+                if !windowFrame.contains(screenPoint) {
+                    self.terminateWithFocusRestoration()
+                }
             }
         }
 
@@ -317,7 +331,7 @@ class MenuApp: NSObject, NSApplicationDelegate, NSTableViewDataSource, NSTableVi
         // Configure search field cell
         if let cell = searchField.cell as? NSSearchFieldCell {
             cell.font = NSFont.systemFont(ofSize: 24, weight: .regular)
-            cell.placeholderString = "Search..."
+            cell.placeholderString = placeholderText
             cell.searchButtonCell = nil
             cell.cancelButtonCell = nil
             cell.bezelStyle = .squareBezel
@@ -336,7 +350,7 @@ class MenuApp: NSObject, NSApplicationDelegate, NSTableViewDataSource, NSTableVi
                 .font: NSFont.systemFont(ofSize: 24, weight: .regular),
                 .foregroundColor: NSColor.white
             ]
-            cell.placeholderAttributedString = NSAttributedString(string: "Search...", attributes: attributes)
+            cell.placeholderAttributedString = NSAttributedString(string: placeholderText, attributes: attributes)
         }
         
         // Remove any border or background from the search field itself
@@ -419,13 +433,22 @@ class MenuApp: NSObject, NSApplicationDelegate, NSTableViewDataSource, NSTableVi
         NSApp.activate(ignoringOtherApps: true)
         window.orderFrontRegardless()
         
-        // Add focus observer
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(windowDidResignKey),
-            name: NSWindow.didResignKeyNotification,
-            object: window
-        )
+        // Force focus after a brief delay to ensure window is ready
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            self.window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            self.window.becomeMain()
+        }
+        
+        // Add focus observer (only if not in persistent mode)
+        if !isPersistentMode() {
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(windowDidResignKey),
+                name: NSWindow.didResignKeyNotification,
+                object: window
+            )
+        }
 
         // Window-level key event monitoring
         NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
@@ -450,7 +473,7 @@ class MenuApp: NSObject, NSApplicationDelegate, NSTableViewDataSource, NSTableVi
 
             // Escape key
             if event.keyCode == 53 {
-                NSApp.terminate(nil)
+                self.terminateWithFocusRestoration()
                 return nil
             }
 
@@ -590,14 +613,14 @@ class MenuApp: NSObject, NSApplicationDelegate, NSTableViewDataSource, NSTableVi
             filteredItems = allItems
         } else {
             // Get matches with scores
-            let matches = allItems.compactMap { item -> FuzzyMatchResult? in
+            let matches = allItems.compactMap { item -> (String, FuzzyMatchResult)? in
                 let (_, result) = fuzzyMatch(pattern: query, string: item)
-                return result
+                return result.map { (item, $0) }
             }
-            .sorted { $0.score > $1.score }
+            .sorted { $0.1.score > $1.1.score }
             
-            // Extract just the strings in order of score
-            filteredItems = matches.map { $0.string }
+            // Extract just the original strings in order of score
+            filteredItems = matches.map { $0.0 }
         }
         
         tableView.reloadData()
@@ -645,7 +668,7 @@ class MenuApp: NSObject, NSApplicationDelegate, NSTableViewDataSource, NSTableVi
         guard row >= 0 && row < filteredItems.count else { return }
         print(filteredItems[row])
         fflush(stdout)
-        NSApp.terminate(nil)
+        terminateWithFocusRestoration()
     }
     
     /// Handles click events on table rows
@@ -663,10 +686,25 @@ class MenuApp: NSObject, NSApplicationDelegate, NSTableViewDataSource, NSTableVi
             NSApp.activate(ignoringOtherApps: true)
         }
     }
+    
+    /// Restores focus to the previously active application
+    func restorePreviousAppFocus() {
+        if let previousApp = previouslyActiveApp, previousApp.isActive == false {
+            previousApp.activate()
+        }
+    }
+    
+    /// Terminates the application and restores focus to the previously active app
+    func terminateWithFocusRestoration() {
+        restorePreviousAppFocus()
+        NSApp.terminate(nil)
+    }
 }
 
 private let helpFlags: Set<String>     = ["-h", "--help", "help"]
 private let versionFlags: Set<String>  = ["-v", "--version", "version"]
+private let persistentFlags: Set<String> = ["--persistent", "persistent"]
+private let placeholderFlags: Set<String> = ["-p", "--placeholder"]
 
 private func handleEarlyFlags() {
     let args = Set(CommandLine.arguments.dropFirst())
@@ -681,6 +719,8 @@ private func handleEarlyFlags() {
         OPTIONS:
           -h, --help,   help      Show this help and quit
           -v, --version,version   Show version and quit
+          --persistent            Disable close-on-blur behavior (window stays open when clicking outside)
+          -p, --placeholder <text>  Set custom placeholder text for the search field
         """)
         exit(EXIT_SUCCESS)
     }
@@ -690,6 +730,24 @@ private func handleEarlyFlags() {
         print("mac-menu \(version)")
         exit(EXIT_SUCCESS)
     }
+}
+
+private func isPersistentMode() -> Bool {
+    let args = Set(CommandLine.arguments.dropFirst())
+    return !persistentFlags.isDisjoint(with: args)
+}
+
+private func getPlaceholderText() -> String {
+    let args = CommandLine.arguments
+    
+    // Check for placeholder flag at any position
+    for i in 0..<args.count - 1 {
+        if args[i] == "-p" || args[i] == "--placeholder" {
+            return args[i + 1]
+        }
+    }
+    
+    return "Search..." // Default placeholder text
 }
 
 handleEarlyFlags()
