@@ -324,9 +324,8 @@ class MenuApp: NSObject, NSApplicationDelegate, NSTableViewDataSource, NSTableVi
         searchField.focusRingType = .none
         searchField.delegate = self
         
-        // Create a custom clear appearance
-        let clearAppearance = NSAppearance(named: .darkAqua)
-        searchField.appearance = clearAppearance
+        // Use system appearance instead of forcing dark mode
+        searchField.appearance = nil
         
         // Configure search field cell
         if let cell = searchField.cell as? NSSearchFieldCell {
@@ -349,9 +348,12 @@ class MenuApp: NSObject, NSApplicationDelegate, NSTableViewDataSource, NSTableVi
             let attributes: [NSAttributedString.Key: Any] = [
                 .paragraphStyle: style,
                 .font: NSFont.systemFont(ofSize: 20, weight: .regular),
-                .foregroundColor: NSColor.labelColor
+                .foregroundColor: NSColor.labelColor.withAlphaComponent(0.6)
             ]
             cell.placeholderAttributedString = NSAttributedString(string: placeholderText, attributes: attributes)
+            
+            // Ensure text color is properly set
+            cell.textColor = NSColor.labelColor
         }
         
         // Enable paste functionality - users can now paste text using Cmd+V
@@ -369,10 +371,11 @@ class MenuApp: NSObject, NSApplicationDelegate, NSTableViewDataSource, NSTableVi
         searchField.isBezeled = false
         searchField.isBordered = false
         
-        // Force the field editor to be transparent
+        // Force the field editor to be transparent and set text color
         if let fieldEditor = window.fieldEditor(false, for: searchField) as? NSTextView {
             fieldEditor.backgroundColor = NSColor.clear
             fieldEditor.drawsBackground = false
+            fieldEditor.textColor = NSColor.labelColor
             // Enable paste functionality in the field editor
             fieldEditor.isEditable = true
             fieldEditor.isSelectable = true
@@ -389,6 +392,7 @@ class MenuApp: NSObject, NSApplicationDelegate, NSTableViewDataSource, NSTableVi
                 textField.drawsBackground = false
                 textField.isBezeled = false
                 textField.isBordered = false
+                textField.textColor = NSColor.labelColor
             }
         }
         
