@@ -16,9 +16,9 @@ class HoverTableRowView: NSTableRowView {
     /// - Parameter dirtyRect: The area that needs to be redrawn
     override func drawSelection(in dirtyRect: NSRect) {
         if self.selectionHighlightStyle != .none {
-            let selectionRect = NSRect(x: 2, y: 2, width: self.bounds.width - 4, height: self.bounds.height - 4)
+            let selectionRect = NSRect(x: 4, y: 0, width: self.bounds.width - 8, height: self.bounds.height)
             let path = NSBezierPath(roundedRect: selectionRect, xRadius: 6, yRadius: 6)
-            NSColor.white.withAlphaComponent(0.1).setFill()
+            NSColor.white.withAlphaComponent(0.33).setFill()
             path.fill()
         }
     }
@@ -36,9 +36,9 @@ class HoverTableRowView: NSTableRowView {
     override func mouseEntered(with event: NSEvent) {
         super.mouseEntered(with: event)
         if !isSelected {
-            let hoverRect = NSRect(x: 2, y: 2, width: self.bounds.width - 4, height: self.bounds.height - 4)
+            let hoverRect = NSRect(x: 4, y: 0, width: self.bounds.width - 8, height: self.bounds.height)
             let path = NSBezierPath(roundedRect: hoverRect, xRadius: 6, yRadius: 6)
-            NSColor.white.withAlphaComponent(0.05).setFill()
+            NSColor.labelColor.withAlphaComponent(0.05).setFill()
             path.fill()
         }
         self.needsDisplay = true
@@ -191,9 +191,9 @@ class MenuApp: NSObject, NSApplicationDelegate, NSTableViewDataSource, NSTableVi
         
         let screenSize = NSScreen.main!.frame
         let width: CGFloat = 720
-        let itemHeight: CGFloat = 48
-        let maxVisibleItems: CGFloat = 5
-        let searchHeight: CGFloat = 57
+        let itemHeight: CGFloat = 20
+        let maxVisibleItems: CGFloat = 32
+        let searchHeight: CGFloat = 50
         let borderRadius: CGFloat = 12
         
         // Calculate fixed height based on maximum visible items
@@ -298,27 +298,27 @@ class MenuApp: NSObject, NSApplicationDelegate, NSTableViewDataSource, NSTableVi
         overlayView.alphaValue = 0.5
         
         // Search field - position at top with vertical centering
-        let searchFieldHeight: CGFloat = 36
-        let verticalPadding: CGFloat = 8  // Explicit padding for fine-tuning
+        let searchFieldHeight: CGFloat = 32
+        let verticalPadding: CGFloat = 6  // Reduced padding for tighter layout
         let searchFieldY = height - searchHeight + verticalPadding
         let horizontalPadding: CGFloat = 0
-        let textPadding: CGFloat = 8
+        let textPadding: CGFloat = 2
         
         // Add search icon
-        let searchIcon = NSImageView(frame: NSRect(x: horizontalPadding + 16,
-                                                  y: searchFieldY + (searchFieldHeight - 24) / 2,  // Center vertically
-                                                  width: 32,
-                                                  height: 32))
-        let config = NSImage.SymbolConfiguration(pointSize: 32, weight: .light)
+        let searchIcon = NSImageView(frame: NSRect(x: horizontalPadding + 12,
+                                                  y: searchFieldY + (searchFieldHeight - 16) / 2,  // Center vertically
+                                                  width: 24,
+                                                  height: 24))
+        let config = NSImage.SymbolConfiguration(pointSize: 24, weight: .light)
         searchIcon.image = NSImage(systemSymbolName: "magnifyingglass", accessibilityDescription: "Search")?.withSymbolConfiguration(config)
-        searchIcon.contentTintColor = NSColor.white.withAlphaComponent(0.6)
+        searchIcon.contentTintColor = NSColor.labelColor.withAlphaComponent(0.6)
         searchIcon.imageScaling = .scaleProportionallyUpOrDown
         containerView.addSubview(searchIcon)
         
         // Configure search field
-        searchField = NSSearchField(frame: NSRect(x: horizontalPadding + textPadding + 48, 
+        searchField = NSSearchField(frame: NSRect(x: horizontalPadding + textPadding + 36, 
                                                 y: searchFieldY,
-                                                width: width - (horizontalPadding + textPadding) * 2 - 48, 
+                                                width: width - (horizontalPadding + textPadding) * 2 - 36, 
                                                 height: searchFieldHeight))
         searchField.wantsLayer = true
         searchField.focusRingType = .none
@@ -330,7 +330,7 @@ class MenuApp: NSObject, NSApplicationDelegate, NSTableViewDataSource, NSTableVi
         
         // Configure search field cell
         if let cell = searchField.cell as? NSSearchFieldCell {
-            cell.font = NSFont.systemFont(ofSize: 24, weight: .regular)
+            cell.font = NSFont.systemFont(ofSize: 20, weight: .regular)
             cell.placeholderString = placeholderText
             cell.searchButtonCell = nil
             cell.cancelButtonCell = nil
@@ -340,24 +340,30 @@ class MenuApp: NSObject, NSApplicationDelegate, NSTableViewDataSource, NSTableVi
             cell.sendsActionOnEndEditing = true
             cell.isScrollable = true
             cell.usesSingleLineMode = true
+            cell.textColor = NSColor.labelColor
             
             // Set proper text attributes for padding
             let style = NSMutableParagraphStyle()
-            style.firstLineHeadIndent = 8
-            style.headIndent = 8
+            style.firstLineHeadIndent = 6
+            style.headIndent = 6
             let attributes: [NSAttributedString.Key: Any] = [
                 .paragraphStyle: style,
-                .font: NSFont.systemFont(ofSize: 24, weight: .regular),
-                .foregroundColor: NSColor.white
+                .font: NSFont.systemFont(ofSize: 20, weight: .regular),
+                .foregroundColor: NSColor.labelColor
             ]
             cell.placeholderAttributedString = NSAttributedString(string: placeholderText, attributes: attributes)
         }
+        
+        // Enable paste functionality - users can now paste text using Cmd+V
+        searchField.allowsEditingTextAttributes = false
+        searchField.isEditable = true
+        searchField.isSelectable = true
         
         // Remove any border or background from the search field itself
         searchField.layer?.borderWidth = 0
         searchField.layer?.cornerRadius = 0
         searchField.layer?.masksToBounds = true
-        searchField.textColor = NSColor.white
+        searchField.textColor = NSColor.labelColor
         searchField.backgroundColor = NSColor.clear
         searchField.drawsBackground = false
         searchField.isBezeled = false
@@ -367,6 +373,9 @@ class MenuApp: NSObject, NSApplicationDelegate, NSTableViewDataSource, NSTableVi
         if let fieldEditor = window.fieldEditor(false, for: searchField) as? NSTextView {
             fieldEditor.backgroundColor = NSColor.clear
             fieldEditor.drawsBackground = false
+            // Enable paste functionality in the field editor
+            fieldEditor.isEditable = true
+            fieldEditor.isSelectable = true
         }
         
         // Remove the default search field styling from all subviews
@@ -391,12 +400,12 @@ class MenuApp: NSObject, NSApplicationDelegate, NSTableViewDataSource, NSTableVi
                                            width: width - horizontalPadding * 2, 
                                            height: 1))
         separator.wantsLayer = true
-        separator.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.1).cgColor
+        separator.layer?.backgroundColor = NSColor.labelColor.withAlphaComponent(0.1).cgColor
         containerView.addSubview(separator)
 
         // Configure table view
         let tableHeight = height - searchHeight
-        let sideMargin: CGFloat = 8
+        let sideMargin: CGFloat = 2
         scrollView = NSScrollView(frame: NSRect(x: sideMargin, 
                                               y: sideMargin, 
                                               width: width - (sideMargin * 2), 
@@ -405,6 +414,8 @@ class MenuApp: NSObject, NSApplicationDelegate, NSTableViewDataSource, NSTableVi
         scrollView.verticalScroller?.alphaValue = 0
         scrollView.backgroundColor = NSColor.clear
         scrollView.drawsBackground = false
+        scrollView.borderType = .noBorder
+        scrollView.autohidesScrollers = true
 
         tableView = NSTableView(frame: scrollView.bounds)
         tableView.delegate = self
@@ -415,6 +426,7 @@ class MenuApp: NSObject, NSApplicationDelegate, NSTableViewDataSource, NSTableVi
         tableView.enclosingScrollView?.drawsBackground = false
         tableView.rowHeight = itemHeight
         tableView.intercellSpacing = NSSize(width: 0, height: 0)
+        tableView.gridStyleMask = []
         tableView.action = #selector(handleClick)
         tableView.target = self
 
@@ -426,6 +438,13 @@ class MenuApp: NSObject, NSApplicationDelegate, NSTableViewDataSource, NSTableVi
         containerView.addSubview(scrollView)
 
         window.makeFirstResponder(searchField)
+        
+        // Ensure the search field is properly configured for paste functionality
+        if let fieldEditor = window.fieldEditor(false, for: searchField) as? NSTextView {
+            fieldEditor.isEditable = true
+            fieldEditor.isSelectable = true
+        }
+        
         window.center()
         window.makeKeyAndOrderFront(nil)
         
@@ -452,6 +471,16 @@ class MenuApp: NSObject, NSApplicationDelegate, NSTableViewDataSource, NSTableVi
 
         // Window-level key event monitoring
         NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            // Handle paste command (Cmd+V)
+            if event.modifierFlags.contains(.command) && event.keyCode == 9 { // Cmd+V
+                if let pasteboard = NSPasteboard.general.string(forType: .string) {
+                    self.searchField.stringValue = pasteboard
+                    // Trigger the search field change event
+                    self.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification, object: self.searchField))
+                    return nil
+                }
+            }
+            
             // Navigation keys
             if event.keyCode == 126 || // Up arrow
                (event.modifierFlags.contains(.control) && event.keyCode == 35) { // Ctrl + P
@@ -473,7 +502,15 @@ class MenuApp: NSObject, NSApplicationDelegate, NSTableViewDataSource, NSTableVi
 
             // Escape key
             if event.keyCode == 53 {
-                self.terminateWithFocusRestoration()
+                let query = self.searchField.stringValue
+                if !query.isEmpty {
+                    // Clear the search query
+                    self.searchField.stringValue = ""
+                    self.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification, object: self.searchField))
+                } else {
+                    // Close the application if no search query
+                    self.terminateWithFocusRestoration()
+                }
                 return nil
             }
 
@@ -530,25 +567,39 @@ class MenuApp: NSObject, NSApplicationDelegate, NSTableViewDataSource, NSTableVi
     ///   - row: The row for which to provide the view
     /// - Returns: The view to display in the table cell
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-        let cellPadding: CGFloat = 4
-        let cell = NSTextField(labelWithString: filteredItems[row])
-        cell.textColor = NSColor.white
-        cell.backgroundColor = NSColor.clear
-        cell.isBordered = false
-        cell.font = NSFont.systemFont(ofSize: 16, weight: .regular)
-        cell.lineBreakMode = .byTruncatingTail
+        let cellPadding: CGFloat = 2
         
         // Create container for proper padding and hover state
         let container = NSView(frame: NSRect(x: 0, y: 0, width: tableView.frame.width, height: tableView.rowHeight))
         container.wantsLayer = true
         
-        // Center the cell vertically in its container and add side padding
-        let cellHeight = cell.cell?.cellSize.height ?? 20
-        let yOffset = (container.frame.height - cellHeight) / 2
+        // Create a custom text field with proper vertical centering
+        let cell = NSTextField()
+        cell.stringValue = filteredItems[row]
+        cell.textColor = NSColor.labelColor
+        cell.backgroundColor = NSColor.clear
+        cell.isBordered = false
+        cell.font = NSFont.systemFont(ofSize: 13, weight: .regular)
+        cell.lineBreakMode = .byTruncatingTail
+        cell.alignment = .left
+        cell.isEditable = false
+        cell.isSelectable = false
+        
+        // Configure the cell for proper vertical alignment
+        if let cellCell = cell.cell as? NSTextFieldCell {
+            cellCell.usesSingleLineMode = true
+            cellCell.isScrollable = false
+        }
+        
+        // Calculate the natural height of the text and center it
+        let textSize = cell.cell?.cellSize ?? NSSize(width: 0, height: 16)
+        let yOffset = (container.frame.height - textSize.height) / 2
+        
+        // Position the cell with proper padding and vertical centering
         cell.frame = NSRect(x: cellPadding, 
                           y: yOffset,
-                          width: container.frame.width - (cellPadding * 2), 
-                          height: cellHeight)
+                          width: container.frame.width - (cellPadding), 
+                          height: textSize.height)
         
         container.addSubview(cell)
         return container
@@ -572,7 +623,7 @@ class MenuApp: NSObject, NSApplicationDelegate, NSTableViewDataSource, NSTableVi
     ///   - row: The row for which to return the height
     /// - Returns: The height of the row
     func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
-        return 48 // Consistent row height
+        return 24 // Tighter row height
     }
     
     /// Called when a row view is added to the table
@@ -629,6 +680,22 @@ class MenuApp: NSObject, NSApplicationDelegate, NSTableViewDataSource, NSTableVi
         }
     }
     
+    /// Called when the search field begins editing
+    /// - Parameter obj: The notification object
+    func controlTextDidBeginEditing(_ obj: Notification) {
+        // Ensure the search field can handle paste events
+        if let searchField = obj.object as? NSSearchField {
+            searchField.isEditable = true
+            searchField.isSelectable = true
+        }
+    }
+    
+    /// Called when the search field ends editing
+    /// - Parameter obj: The notification object
+    func controlTextDidEndEditing(_ obj: Notification) {
+        // Handle any cleanup if needed
+    }
+    
     /// Handles special key commands in the search field
     /// - Parameters:
     ///   - control: The control sending the command
@@ -638,6 +705,8 @@ class MenuApp: NSObject, NSApplicationDelegate, NSTableViewDataSource, NSTableVi
     func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
         return false  // Let the default key handling work
     }
+    
+
     
     // MARK: - Selection Handling
     
@@ -696,7 +765,7 @@ class MenuApp: NSObject, NSApplicationDelegate, NSTableViewDataSource, NSTableVi
     
     /// Terminates the application and restores focus to the previously active app
     func terminateWithFocusRestoration() {
-        restorePreviousAppFocus()
+        // restorePreviousAppFocus()
         NSApp.terminate(nil)
     }
 }
